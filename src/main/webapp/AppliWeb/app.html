@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html id="html">
+
+<head>
+    <meta charset="UTF-8">
+    <title>TinyPet</title>
+
+    <meta name="google-signin-client_id" content="272468622365-p6jr8ke5j8pc0gqear4f9150ep42qjlj.apps.googleusercontent.com">    
+    <meta name="google-signin-plugin_name" content="stop bugging me">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+
+    <link rel="stylesheet" href="Style.css">
+
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+
+    <script src="https://unpkg.com/mithril/mithril.js"></script>
+
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+</head>
+
+<body class="has-navbar-fixed-top">
+    <script>
+//Initialisation variables
+        var connectedUser = {
+            id: null,
+            prenom: "",
+            name: "",
+        };
+        var currentURL = "/";
+        var hostApi = "https://devwebcloud-tinypet.appspot.com/_ah/api/myApi/v1";
+        var intervalNotificationId = null;
+        var indexTop10NewPetitionsView, indexTop10SignedPetitionsView,indexMyPetitionCreatedView, indexMyPetitionSignedView, indexSearchPetitionView;
+        var TabMyPetitionSigned = TabMyPetitionCreated;
+        var notification = {
+            message: "",
+            close: true,
+            Duree: 0,
+            DureeMax: 2000,
+            Step: 500,
+            classSup: "",
+            id: null
+        }
+        
+//fonctions
+    //Notifications
+        function closeNotification(id = "notification") {
+            clearInterval(intervalNotificationId);
+            notification.close = true;
+            notification.message = "";
+            notification.classSup = "";
+            document.getElementById(id).classList.add('hide');
+
+        }
+        function showNotification() {
+            notification.Duree += notification.Step;
+            if (notification.Duree >= notification.DureeMax) {
+                closeNotification(notification.id);
+            }
+        }
+        function startNotification(message, classSup = "is-primary", id = "notification") {
+            notification.Duree = 0;
+            notification.message = message;
+            notification.classSup = classSup;
+            notification.close = false;
+            notification.id = id;
+            document.getElementById(id).classList.remove('hide');
+
+            intervalNotificationId = setInterval(showNotification, notification.Step);
+        }
+    //Google 
+        function onSignIn(googleUser) {
+            var profile = googleUser.getBasicProfile();
+            connectedUser.id = parseInt(parseInt(profile.getId()) / 1000000000000);
+            connectedUser.prenom = "" + profile.getGivenName();
+            connectedUser.name = "" + profile.getName();
+            console.log('ID: ' + profile.getId());
+            console.log('nom complet: ' + profile.getName());
+            console.log('prenom: ' + profile.getGivenName());
+            document.getElementById("login_google").classList.add('hide');
+            document.getElementById("logout_google").classList.remove('hide');
+            console.log(connectedUser);
+        }
+        function signOut() {
+            var auth2 = gapi.auth2.getAuthInstance();
+            auth2.signOut().then(function () {
+                connectedUser.id = null;
+                connectedUser.prenom = "";
+                connectedUser.name = "";
+                document.getElementById("login_google").classList.remove('hide');
+                document.getElementById("logout_google").classList.add('hide');
+                startNotification('Vous êtes deconnecté', "is-primary", "notification");
+            });
+        }  
+    //fillView
+        function majCardView(index) {
+            var cardView = document.getElementsByClassName("card slider")[index];
+
+            cardView.getElementsByClassName("title")[0].innerHTML = Api_CrudPetition.item.titre;
+            cardView.getElementsByClassName("subtitle")[0].innerHTML = Api_CrudPetition.item.description;
+            var pourcent = Math.ceil(100 * Api_CrudPetition.item.nbSignataire / Api_CrudPetition.item.objectifSignataire);
+            if (Api_CrudPetition.item.objectifSignataire == 0) {
+                pourcent = 100;
+            }
+            cardView.getElementsByTagName("progress")[0].outerHTML = "<progress value=" + pourcent + " max=\"100\" class=\"progress is-success\"></progress>";
+            cardView.getElementsByTagName("strong")[0].innerHTML = Api_CrudPetition.item.nbSignataire + " personnes ont signé";
+            cardView.getElementsByTagName("span")[0].innerHTML = " d'un objectif de " + Api_CrudPetition.item.objectifSignataire + " signatures";
+            cardView.getElementsByTagName("img")[0].src = Api_CrudPetition.item.img_url;
+        }
+        function majSignatureView() {
+            var cardView = document.getElementsByClassName("card slider")[API_infoPetition.index];
+
+            var pourcent = Math.ceil(100 * API_infoPetition.item.nbSignataire / API_infoPetition.item.objectifSignataire);
+            if (API_infoPetition.item.objectifSignataire == 0) {
+                pourcent = 100;
+            }
+            cardView.getElementsByTagName("progress")[0].outerHTML = "<progress value=" + pourcent + " max=\"100\" class=\"progress is-success\"></progress>";
+
+            cardView.getElementsByTagName("strong")[0].innerHTML = API_infoPetition.item.nbSignataire + " personnes ont signé ";
+
+        }
+        function goTop() {
+            window.scrollTo({ top: 0 });
+        }
+    //ShowHideViews
+        function ShowCreateAndUpdatePetitionView(idItem = null, index = null) {
+            if (idItem == null) {
+                Api_CrudPetition.item = getPetitionObject();
+                Api_CrudPetition.index = null;
+            } else {
+                API_infoPetition.index = index;
+                API_infoPetition.loadPetition(idItem);
+                Api_CrudPetition.index = index;
+
+            }
+
+            document.getElementById("CreateAndUpdatePetitionView").classList.add('is-active');
+            document.getElementById("html").classList.add('is-clipped');
+        }
+        function HideCreateAndUpdatePetitionView() {
+            document.getElementById("CreateAndUpdatePetitionView").classList.remove('is-active');
+            document.getElementById("html").classList.remove('is-clipped');
+            Api_CrudPetition.item = getPetitionObject();
+        }
+        function ShowDetailPetitionView() {
+            document.getElementById("DetailPetitionView").classList.add('is-active');
+            document.getElementById("html").classList.add('is-clipped');
+        }
+        function HideDetailPetitionView() {
+            document.getElementById("DetailPetitionView").classList.remove('is-active');
+            document.getElementById("html").classList.remove('is-clipped');
+        }      
+    //Objet
+        function getPetitionObject() {
+            return item = {
+                ID: null,
+                titre: null,
+                description: null,
+                date: null,
+                update_at: null,
+                proprietaire: connectedUser.id,
+                proprietaireName: connectedUser.name,
+                nbSignataire: 0,
+                objectifSignataire: 0,
+                img_url: null
+            }
+        }
+        function convertToPetitionObject(ApiItem) {
+            return item = {
+                ID: ApiItem.key.name,
+                titre: item.properties.titre,
+                description: null,
+                date: null,
+                update_at: null,
+                proprietaire: null,
+                proprietaireName: null,
+                nbSignataire: 0,
+                objectifSignataire: 0,
+                img_url: null
+            }
+        }
+
+        //10 dernières pétitions
+        var Top10NewPetitions = {
+            list: [],
+            previous: ["0"],
+            next: ["0"],
+            loadList: function (idItem) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/petition/news/top10/:id",
+                    params: { id: idItem }
+                })
+                    .then(function (result) {
+
+                        Top10NewPetitions.list = result.items;
+                        goTop();
+                        var last = result.items[result.items.length - 1].key.name;
+                        var previousNext = Top10NewPetitions.next[Top10NewPetitions.next.length - 1];
+                        if (previousNext == undefined) {
+                            previousNext = 0;
+                        }
+                        if (last > previousNext) {
+                            Top10NewPetitions.previous.push(previousNext);
+                            Top10NewPetitions.next.push(last);
+                        }
+                        if (last <= previousNext && Top10NewPetitions.previous.length > 2) {
+                            Top10NewPetitions.previous.pop();
+                            Top10NewPetitions.next.pop();
+                        }
+                    })
+            }
+        }
+        var Top10NewPetitionsView = {
+            oninit: function (vnode) {
+                indexTop10NewPetitionsView = 0;
+            },
+            oncreate: function (vnode) {
+                currentURL = "/";
+                Top10NewPetitions.loadList(indexTop10NewPetitionsView);
+            },
+            view: function () {
+                return [Top10NewPetitions.list.map(function (item, index) {
+                    return m(cardPetition, { item: item, index: index })
+                }), m(paginationTop10New)]
+            }
+        }
+        var paginationTop10New = {
+            view: function () {
+                return Top10NewPetitions.list.length < 10 ? "" : m("nav", { "class": "pagination is-rounded", "role": "navigation", "aria-label": "pagination" },
+                    [
+
+                        m(m.route.Link, {
+                            "class": "pagination-previous", href: "/", onclick: function (e) {
+                                indexTop10NewPetitionsView = Top10NewPetitions.previous[Top10NewPetitions.previous.length - 2];
+                                if (indexTop10NewPetitionsView == undefined) {
+                                    indexTop10NewPetitionsView = 0;
+                                }
+                                Top10NewPetitions.loadList(indexTop10NewPetitionsView)
+
+                            }
+                        }, "Page précédente"),
+                        m(m.route.Link, {
+                            "class": "pagination-next", href: "/", onclick: function (e) {
+                                indexTop10NewPetitionsView = Top10NewPetitions.next[Top10NewPetitions.next.length - 1];
+                                Top10NewPetitions.loadList(indexTop10NewPetitionsView)
+                            }
+                        }, "Page suivante")
+                    ]
+                )
+            }
+        } 
+
+        //10 pétitions les plus signées
+        var Top10SignedPetitions = {
+            list: [],
+            previous: "0",
+            next: "0",
+            loadList: function (idItem) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/petition/signed/top10/:id",
+                    params: { id: idItem }
+                })
+                    .then(function (result) {
+                        Top10SignedPetitions.list = result.items;
+                        goTop();
+                        Top10SignedPetitions.previous = Top10SignedPetitions.next;
+                        Top10SignedPetitions.next = result.items[result.items.length - 1].key.name;
+                    })
+            }
+        }
+        var Top10SignedPetitionsView = {
+            oninit: function (vnode) {
+                indexTop10SignedPetitionsView = 0;
+            },
+            oncreate: function (vnode) {
+                currentURL = "/Top100Signed";
+                Top10SignedPetitions.loadList(indexTop10SignedPetitionsView);
+
+            },
+            view: function () {
+                return [Top10SignedPetitions.list.map(function (item, index) {
+                    return m(cardPetition, { item: item, index: index })
+                })]
+            }
+        }
+        var paginationMyPetitionSigned = {
+            view: function () {
+                return API_MyPetitionSigned.list.length < 10 ? "" : m("nav", { "class": "pagination is-rounded", "role": "navigation", "aria-label": "pagination" },
+                    [
+
+                        m(m.route.Link, {
+                            "class": "pagination-previous", href: "/", onclick: function (e) {
+                                indexMyPetitionSignedView = API_MyPetitionSigned.previous[API_MyPetitionSigned.previous.length - 2];
+                                if (indexMyPetitionSignedView == undefined) {
+                                    indexMyPetitionSignedView = 0;
+                                }
+                                API_MyPetitionSigned.loadList(indexMyPetitionSignedView)
+
+                            }
+                        }, "Page précédente"),
+                        m(m.route.Link, {
+                            "class": "pagination-next", href: "/", onclick: function (e) {
+                                indexMyPetitionSignedView = API_MyPetitionSigned.next[API_MyPetitionSigned.next.length - 1];
+                                API_MyPetitionSigned.loadList(indexMyPetitionSignedView)
+                            }
+                        }, "Page suivante")
+                    ]
+                )
+            }
+        }
+
+//Mes péttions
+    //Pétitions crées
+        var TabMyPetitionCreated = {
+            view: function () {
+                return [
+                    m("hr", { "class": "m-0 p-22" }),
+                    m("br"),
+                    m("h2", { "class": "title is-2 has-text-centered" },
+                        "Bienvenue, " + connectedUser.name
+                    ),
+                    m("div", { "class": "tabs is-centered m-0" },
+                        m("ul",
+                            [
+                                m("li", { class: currentURL == "/MyPetitionCreated" ? "is-active" : "" }, m(m.route.Link, {
+                                    href: "/MyPetitionCreated", onclick: function (e) {
+                                        currentURL = '/MyPetitionCreated';
+                                    }
+                                }, "Pétition(s) lancée(s)")),
+                                m("li", { class: currentURL == "/MyPetitionSigned" ? "is-active" : "" }, m(m.route.Link, {
+                                    href: "/MyPetitionSigned", onclick: function (e) {
+                                        currentURL = '/MyPetitionSigned';
+                                    }
+                                }, "Pétition(s) signée(s)"))
+
+                            ]
+                        )
+                    )
+                ]
+            }
+        }
+        var MyPetitionCreatedView = {
+            oninit: function (vnode) {
+                indexMyPetitionCreatedView = 0;
+            },
+            oncreate: function (vnode) {
+                currentURL = "/MyPetitionCreated";
+                API_MyPetitionCreated.loadList(indexMyPetitionCreatedView);
+
+            },
+            view: function () {
+                return [API_MyPetitionCreated.list.map(function (item, index) {
+                    return m(cardPetition, { item: item, index: index })
+                }), m(paginationMyPetitionCreated)]
+            }
+        }
+        var paginationMyPetitionCreated = {
+            view: function () {
+                return API_MyPetitionCreated.list.length < 10 ? "" : m("nav", { "class": "pagination is-rounded", "role": "navigation", "aria-label": "pagination" },
+                    [
+
+                        m(m.route.Link, {
+                            "class": "pagination-previous", href: "/", onclick: function (e) {
+                                indexMyPetitionCreatedView = API_MyPetitionCreated.previous[API_MyPetitionCreated.previous.length - 2];
+                                if (indexMyPetitionCreatedView == undefined) {
+                                    indexMyPetitionCreatedView = 0;
+                                }
+                                API_MyPetitionCreated.loadList(indexMyPetitionCreatedView)
+
+                            }
+                        }, "Page précédente"),
+                        m(m.route.Link, {
+                            "class": "pagination-next", href: "/", onclick: function (e) {
+                                indexMyPetitionCreatedView = API_MyPetitionCreated.next[API_MyPetitionCreated.next.length - 1];
+                                API_MyPetitionCreated.loadList(indexMyPetitionCreatedView)
+                            }
+                        }, "Page suivante")
+                    ]
+                )
+            }
+        }
+        var CreateAndUpdatePetitionView = {
+            view: function () {
+                return m("div", { "id": "CreateAndUpdatePetitionView", "class": "modal" },
+                    [
+                        m("div", { "class": "modal-background" }),
+                        m("div", { "class": "modal-card" },
+                            m("form", {
+                                "class": "form scroll-y", onsubmit: function (e) {
+                                    e.preventDefault()
+                                    if (Api_CrudPetition.item.ID == null) {
+                                        Api_CrudPetition.createPetition();
+                                    } else {
+                                        Api_CrudPetition.updatePetition();
+                                    }
+                                    HideCreateAndUpdatePetitionView();
+
+                                }
+                            },
+                                [
+                                    m("header", { "class": "modal-card-head" },
+                                        [
+                                            m("p", { "class": "modal-card-title" },
+                                                "Créer une petition"
+                                            ),
+                                            m("button", {
+                                                onclick: function (e) {
+                                                    e.preventDefault();
+                                                    HideCreateAndUpdatePetitionView();
+                                                }, "class": "delete", "aria-label": "close"
+                                            })
+                                        ]
+                                    ),
+                                    m("section", { "class": "modal-card-body" },
+                                        [
+                                            m("div", { "class": "field " },
+                                                [
+                                                    m("label", { "class": "label" },
+                                                        "Titre"
+                                                    ),
+                                                    m("div", { "class": "control" },
+                                                        m("input", {
+                                                            "class": "input", "type": "text", "placeholder": "Indiquez le titre de votre pétition",
+                                                            oninput: function (e) { Api_CrudPetition.item.titre = e.target.value },
+                                                            value: Api_CrudPetition.item.titre
+                                                        })
+                                                    ),
+                                                    m("p", { "class": "help  is-primary is-light" },
+                                                        "Le titre est obligatoire"
+                                                    )
+                                                ]
+                                            ),
+                                            m("div", { "class": "field " },
+                                                [
+                                                    m("label", { "class": "label" },
+                                                        "Image"
+                                                    ),
+                                                    m("div", { "class": "control" },
+                                                        m("input", {
+                                                            "class": "input", "type": "text", "placeholder": "Indiquez l'URL de votre image",
+                                                            oninput: function (e) { Api_CrudPetition.item.img_url = e.target.value },
+                                                            value: Api_CrudPetition.item.img_url
+                                                        })
+                                                    )
+                                                ]
+                                            ),
+                                            m("div", { "class": "field " },
+                                                [
+                                                    m("label", { "class": "label" },
+                                                        "Nombre de signatures visés"
+                                                    ),
+                                                    m("div", { "class": "control" },
+                                                        m("input", {
+                                                            "class": "input", "type": "number", "placeholder": "Indiquez le nombre de signatures que vous souhaitez atteindre",
+                                                            oninput: function (e) { Api_CrudPetition.item.objectifSignataire = e.target.value },
+                                                            value: Api_CrudPetition.item.objectifSignataire
+                                                        })
+                                                    )
+                                                ]
+                                            ),
+                                            m("div", { "class": "field" },
+                                                [
+                                                    m("label", { "class": "label" },
+                                                        "Description"
+                                                    ),
+                                                    m("div", { "class": "control" },
+                                                        m("textarea", {
+                                                            "class": "textarea ", "rows": "10", "placeholder": "Exprimez vous librement, et donnez tous les détails de votre pétition ",
+                                                            oninput: function (e) { Api_CrudPetition.item.description = e.target.value },
+                                                            value: Api_CrudPetition.item.description
+                                                        })
+                                                    ),
+                                                    m("p", { "class": "help  is-primary is-light" },
+                                                        "La description est obligatoire"
+                                                    )
+                                                ]
+                                            ),
+                                            m("div", { "class": "field" },
+                                                m("div", { "class": "control" },
+                                                    m("label", { "class": "checkbox" },
+                                                        [
+                                                            m("input", { "type": "checkbox" }),
+                                                            " Je suis d'accord avec les termes et conditions "
+                                                        ]
+                                                    )
+                                                )
+                                            )
+                                        ]
+                                    ),
+                                    m("footer", { "class": "modal-card-foot" },
+                                        [
+                                            m("button", { "class": "button is-primary save" },
+                                                "Enregister"
+                                            ),
+                                            m("button", {
+                                                onclick: function (e) {
+                                                    e.preventDefault();
+                                                    HideCreateAndUpdatePetitionView();
+                                                }, "class": "button is-primary is-light cancel"
+                                            },
+                                                "Annuler")
+                                        ]
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            }
+        }
+    //Pétitions signées   
+        var MyPetitionSignedView = {
+            oninit: function (vnode) {
+                indexMyPetitionSignedView = 0;
+            },
+            oncreate: function (vnode) {
+                currentURL = "/MyPetitionSigned";
+                API_MyPetitionSigned.loadList(indexMyPetitionSignedView);
+
+            },
+            view: function () {
+                return [API_MyPetitionSigned.list.map(function (item, index) {
+                    return m(cardPetition, { item: item, index: index })
+                }), m(paginationMyPetitionSigned)]
+            }
+        }
+        
+//Recherche
+        var TabSearchPetition = {
+            view: function () {
+                return [
+                    m("hr"),
+                    m("br"),
+                    m("h2", { "class": "title is-2 has-text-centered" },
+                        "Recherchez des pétitions"
+                    ),
+                    m("div", { "class": "field is-grouped" },
+                        [
+                            m("p", { "class": "control is-expanded" },
+                                [
+                                    m("input", {
+                                        "class": "input", "type": "text", "placeholder": "Titre de la pétition",
+                                        oninput: function (e) { API_SearchPetition.key_search = e.target.value },
+                                        value: API_SearchPetition.key_search
+                                    }),
+                                    m("a", {
+                                        "class": "button is-info",
+                                        onclick: function (e) {
+                                            API_SearchPetition.loadList(0);
+                                        }
+                                    },
+                                        m("span", { "class": "icon mt-8" },
+                                            m("i", { "class": "fas fa-search", "aria-hidden": "true" })
+                                        )
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            }
+        }
+        var SearchPetitionView = {
+            oninit: function (vnode) {
+                indexSearchPetitionView = 0;
+            },
+            oncreate: function (vnode) {
+                currentURL = "/MyPetitionSigned";
+                //API_SearchPetition.loadList(indexSearchPetitionView);
+
+            },
+            view: function () {
+                return [API_SearchPetition.list.map(function (item, index) {
+                    return m(cardPetition, { item: item, index: index })
+                }), m(paginationSearchPetition)]
+            }
+        } 
+        var paginationSearchPetition = {
+            view: function () {
+                return API_SearchPetition.list.length < 10 ? "" : m("nav", { "class": "pagination is-rounded", "role": "navigation", "aria-label": "pagination" },
+                    [
+
+                        m(m.route.Link, {
+                            "class": "pagination-previous", href: "/", onclick: function (e) {
+                                indexSearchPetitionView = API_SearchPetition.previous[API_SearchPetition.previous.length - 2];
+                                if (indexSearchPetitionView == undefined) {
+                                    indexSearchPetitionView = 0;
+                                }
+                                API_SearchPetition.loadList(indexSearchPetitionView)
+
+                            }
+                        }, "Page précédente"),
+                        m(m.route.Link, {
+                            "class": "pagination-next", href: "/", onclick: function (e) {
+                                indexSearchPetitionView = API_SearchPetition.next[API_SearchPetition.next.length - 1];
+                                API_SearchPetition.loadList(indexSearchPetitionView)
+                            }
+                        }, "Page suivante")
+                    ]
+                )
+            }
+        }
+
+//Composants communs
+        var navbar = {
+            view: function () {
+
+                return [m("nav", { "class": "navbar is-fixed-top box", "role": "navigation", "aria-label": "main navigation" },
+                    [
+                        m("div", { "class": "navbar-brand" },
+                            [
+                                m("a", { "class": "", "href": "/" },
+                                    m("img", { "src": "images/logo.png" })),
+                                
+                                
+                                m("a", { "class": "navbar-burger", "role": "button", "aria-label": "menu", "aria-expanded": "false", "data-target": "navbarBasic" },
+                                    [m("span", { "aria-hidden": "true" }), m("span", { "aria-hidden": "true" }), m("span", { "aria-hidden": "true" })])
+                            ]
+                        ),
+                        m("div", { "class": "navbar-menu", "id": "navbarBasic" },
+                            [
+                                m("div", { "class": "navbar-start" },
+                                    [
+                                        m(m.route.Link, {
+                                            href: "/", onclick: function (e) {
+                                                currentURL = '/';
+                                            }, class: currentURL == "/" ? "navbar-item is-active" : "navbar-item"
+                                        }, "Dernières pétitions "),
+                                        
+                                        m(m.route.Link, {
+                                            href: "/top100Signed", onclick: function (e) {currentURL = '/Top100Signed';
+                                            }, class: currentURL == "/Top100Signed" ? "navbar-item is-active" : "navbar-item" 
+                                        }, " Pétitions populaires"),
+                                    
+                                        m(m.route.Link, {
+                                            href: "/SearchPetition", onclick: function (e) {currentURL = '/SearchPetition';
+                                            }, class: currentURL == "/SearchPetition" || currentURL == "/SearchPetition" ? "navbar-item is-active" : "navbar-item"
+                                        }, " Rechercher "),      
+                                    ]
+                                ),                              
+
+                                m("div", { "class": "navbar-end" },        
+
+                                    m("a", {
+                                        onclick: function (e) {
+                                            if(connectedUser.id == null ){
+                                                startNotification("La connexion est nécessaire à la création de pétition");
+                                            } else{
+                                                ShowCreateAndUpdatePetitionView();
+                                            }
+                                        }, class: connectedUser.id == null ? "navbar-item is-hidden" : "navbar-item"
+                                    }, "Créer ma pétition"),
+
+                                    m(m.route.Link, {
+                                        href: "/MyPetitionCreated", onclick: function (e) {currentURL = '/MyPetitionCreated';
+                                        }, class: currentURL == "/MyPetitionCreated" || currentURL == "/MyPetitionSigned" ?  
+                                            (connectedUser.id == null ? "navbar-item is-active is-hidden" : "navbar-item is-active" ) : 
+                                            (connectedUser.id == null ? "navbar-item is-hidden" : "navbar-item" )
+                                    }, "Voir mes petitions"),
+
+                                    m("div", { "class": "navbar-item" },
+                                        m("div", { "class": "buttons" },
+                                            [
+                                                m("div", {
+                                                    "id": "notification", onclick: function (e) {
+                                                        e.preventDefault();
+                                                        closeNotification("notification");
+                                                    }, class: notification.classSup == "" ? "notification is-hidden" : "notification " + notification.classSup
+                                                }, [m("button", { "class": "delete" }), notification.message]
+                                                ),
+
+                                                m("div", { 
+                                                    "id": "login_google", 
+                                                    class: connectedUser.id == null ? "g-signin2" : "g-signin2 is-hidden", 
+                                                    "data-onsuccess": "onSignIn" 
+                                                }),
+
+                                                m("a", {
+                                                    "id": "logout_google", class: connectedUser.id == null ? "button is-light is-hidden" : "button is-light", onclick: function (e) {
+                                                        signOut();
+                                                    }, 
+                                                    "href": "#"
+                                                },
+                                                    m("strong",
+                                                        "Se deconnecter"
+                                                    )
+                                                ),
+                                            ]
+                                        )
+                                    )
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                m(CreateAndUpdatePetitionView), m(DetailPetitionView)
+                ]
+            }
+
+        }                              
+        var TabParcourirPetition = {
+            view: function () {
+                return [
+                    m("hr", { "class": "m-0 p-22" }),
+                    m("br"),
+                    m("div", { "class": "tabs is-centered m-0" },
+                        m("ul",
+                            [
+                                m("li", { class: currentURL == "/" ? "is-active" : "" }, m(m.route.Link, {
+                                    href: "/", onclick: function (e) {
+                                        currentURL = '/';
+                                    }
+                                }, "Les pétitions récentes")),
+                                m("li", { class: currentURL == "/Top100Signed" ? "is-active" : "" }, m(m.route.Link, {
+                                    href: "/top100Signed", onclick: function (e) {
+                                        currentURL = '/Top100Signed';
+                                    }
+                                }, "Top pétitions signées"))
+
+                            ]
+                        )
+                    )
+                ]
+            }
+        }         
+        var TabDetailPetition = {
+            view: function () {
+                return [
+                    m("hr", { "class": "m-0 p-22" }),
+                    m("br"),
+                    m("h2", { "class": "title is-2 has-text-centered" },
+                        "Détails de la pétition"
+                    )
+                ]
+            }
+        }
+        var cardPetition = {
+            view: function (vnode) {
+                var item = vnode.attrs.item;
+                var index = vnode.attrs.index;
+                var pourcent = Math.ceil(100 * item.properties.nbSignataire / item.properties.objectifSignataire);
+                if (item.properties.objectifSignataire == 0) {
+                    pourcent = 100;
+                }
+
+                return m("div", { class: item.deleted != null ? "card slider closed" : "card slider" },
+                    [
+                        m("div", { "class": "card-content" },
+                            [
+                                m("img", { "src": item.properties.img_url }),
+                                m("p", { "class": "title" }, item.properties.titre),
+                                m("p", { "class": "subtitle truncate" }, item.properties.description),
+                                m("progress", { "class": "progress is-success", "value": pourcent, "max": "100" }),
+                                m("p", { "class": "has-text-centered" },
+                                    [
+                                        m("strong", item.properties.nbSignataire + " personnes ont signé "),
+                                        m("span", "d'un objectif de " + item.properties.objectifSignataire + " signatures")
+                                    ]
+                                )
+                            ]
+                        ),
+                        m("footer", { "class": "card-footer" },
+                            item.properties.proprietaire == connectedUser.id ? [
+                                m("p", { "class": "card-footer-item" },
+                                    m("span",
+                                        m("a", {
+                                            "class": "link",
+                                            onclick: function (e) {
+                                                item.deleted = true;
+                                                Api_CrudPetition.deletePetition(item.key.name);
+
+                                            }
+                                        }, [
+                                            m("span", { class: "" }, "Supprimer")
+                                        ])
+                                    )
+                                ),
+                                m("p", { "class": "card-footer-item" },
+                                    m("span",
+                                        m("a", {
+                                            "class": "link",
+                                            onclick: function (e) {
+                                                ShowCreateAndUpdatePetitionView(item.key.name, index);
+                                            }
+                                        }, [
+                                            m("span", { class: "" }, "Modifier")
+                                        ])
+                                    )
+                                )
+                            ] : "",
+                            m("p", { "class": "card-footer-item" },
+                                m("span",
+                                    m("a", {
+                                        "class": "link",
+                                        onclick: function (e) {
+                                            API_infoPetition.index = index;
+                                            API_infoPetition.loadPetition(item.key.name)
+                                            API_SignaturePetition.verifieSignature(item.key.name);
+                                            ShowDetailPetitionView();
+                                        }
+                                    }, [
+                                        m("span", { class: "" }, "Voir la pétition")
+                                    ])
+                                )
+                            )
+                        )
+                    ]
+                )
+            }
+        }
+        var DetailPetitionView = {
+            view: function () {
+                var pourcent = Math.ceil(100 * API_infoPetition.item.nbSignataire / API_infoPetition.item.objectifSignataire);
+                if (API_infoPetition.item.objectifSignataire == 0) {
+                    pourcent = 100;
+                }
+                return m("div", { "id": "DetailPetitionView", "class": "modal full" },
+                    [
+                        m("div", { "class": "modal-background" }),
+                        m("div", { "class": "modal-card" },
+                            m("form", { "class": "form" },
+                                [
+                                    m("section", { "class": "modal-card-body" },
+                                        m("div", { "class": "tile is-ancestor is-vertical" },
+                                            [
+                                                m("div", { "class": "tile is-parent" },
+                                                    [
+                                                        m("div", { "class": "tile is-child box div_adapt" },
+                                                            [
+                                                                m("p", { "class": "title" }, API_infoPetition.item.titre),                                                                
+                                                                m("p", API_infoPetition.item.description),
+                                                                m("br"),                                                                
+                                                                m("span", "Auteur : "),
+                                                                m("span", API_infoPetition.item.proprietaireName), m("br"),
+                                                                m("span", "Date de création : "),
+                                                                m("span", API_infoPetition.item.date), m("br"),
+                                                                m("span", "Date de dernière modification : "),
+                                                                m("span", API_infoPetition.item.update_at), m("br"),
+                                                            ]
+                                                        )
+                                                    ]
+                                                ),
+                                                m("div", { "class": "tile is-vertical is-parent" },
+                                                    [
+                                                        m("div", { "class": "is-child box pb-0" },
+                                                            [
+                                                                m("p", { "class": "has-text-centered mb-10" },
+                                                                    [
+                                                                        m("strong", API_infoPetition.item.nbSignataire + " personnes ont signé"),
+                                                                        m("span", " d'un objectif de " + API_infoPetition.item.objectifSignataire + " signatures"
+                                                                        )
+                                                                    ]
+                                                                ),
+                                                                m("progress", { "class": "progress is-success", "value": pourcent, "max": "100" }),
+                                                                m("footer", { "class": "card-footer" },
+                                                                    m("p", { "class": "card-footer-item" },
+                                                                        m("span", m("a", {
+                                                                            "class": "link", onclick: function (e) {
+                                                                                e.preventDefault();
+                                                                                if (API_infoPetition.item.proprietaire == connectedUser.id) {
+                                                                                    startNotification("Operation invalide : Vous ne pouvez pas signer vos propres petitions!", "is-primary", "notificationDetailPetition")
+                                                                                } else {
+                                                                                    if (API_SignaturePetition.isSigned) {
+                                                                                        API_SignaturePetition.deleteSignature(API_infoPetition.item.ID)
+
+                                                                                    } else if (connectedUser.id==null){
+                                                                                        startNotification("Operation invalide : Vous ne pouvez pas signer, vous n'êtes pas connectés !", "is-primary", "notificationDetailPetition")
+
+                                                                                    } else{                                                                                        
+                                                                                        API_SignaturePetition.addSignature(API_infoPetition.item.ID)
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                            API_SignaturePetition.isSigned ? "Retirer le soutien" : "Soutenir la pétition"
+                                                                        )
+                                                                        )
+                                                                    )
+                                                                )
+                                                            ]
+                                                        ),
+                                                        m("div", { "id": "notificationDetailPetition", class: notification.classSup == "" ? "notification hide" : "notification " + notification.classSup },
+                                                            [
+                                                                m("button", {
+                                                                    "class": "delete", onclick: function (e) {
+                                                                        e.preventDefault();
+                                                                        closeNotification("notificationDetailPetition");
+                                                                    }
+                                                                }),
+                                                                notification.message
+                                                            ]
+                                                        )
+                                                    ]
+                                                )
+                                            ]
+                                        )
+                                    ),
+                                    m("button", {
+                                        onclick: function (e) {
+                                            e.preventDefault();
+                                            HideDetailPetitionView();
+                                        }, "class": "modal-close is-large", "aria-label": "close"
+                                    })
+                                ]
+                            )
+                        )
+                    ]
+                )
+            }
+
+        }
+        
+//API
+        var API_infoPetition = {
+            index: 0,
+            item: getPetitionObject(),
+            loadPetition: function (idItem) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/petition/info/:id",
+                    params: { id: idItem }
+                })
+                    .then(function (result) {
+                        API_infoPetition.item = result.properties
+                        Api_CrudPetition.item = result.properties
+                        Api_CrudPetition.item.ID = result.key.name
+                    })
+            }
+        }
+        var API_SignaturePetition = {
+            isSigned: false,
+            verifieSignature: function (idItem) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/signature/verifie/:petitionID/:userID",
+                    params: { petitionID: idItem, userID: connectedUser.id }
+                })
+                    .then(function (result) {
+                        API_SignaturePetition.isSigned = result.properties.signed
+                    })
+            },
+            addSignature: function (idItem) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/signature/add/:petitionID/:userID",
+                    params: { petitionID: idItem, userID: connectedUser.id }
+                })
+                    .then(function (result) {
+                        startNotification(result.properties.message);
+                        API_SignaturePetition.isSigned = true;
+                        API_infoPetition.item.nbSignataire++;
+                        majSignatureView();
+                    })
+
+            },
+            deleteSignature: function (idItem) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/signature/delete/:petitionID/:userID",
+                    params: { petitionID: idItem, userID: connectedUser.id }
+                })
+                    .then(function (result) {
+                        startNotification(result.properties.message);
+                        API_SignaturePetition.isSigned = false;
+                        API_infoPetition.item.nbSignataire--;
+                        majSignatureView();
+                    })
+            }
+        }
+        var API_MyPetitionCreated = {
+            list: [],
+            previous: ["0"],
+            next: ["0"],
+            loadList: function (idItem) {
+
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/petition/created/:userID/:last",
+                    params: { userID: connectedUser.id, last: idItem }
+                })
+                    .then(function (result) {
+
+                        API_MyPetitionCreated.list = result.items;
+                        goTop();
+                        if (result.items.length == 0) {
+                            startNotification("Aucune pétition créée pour le moment");
+                        } else {
+                            var last = result.items[result.items.length - 1].key.name;
+                            var previousNext = API_MyPetitionCreated.next[API_MyPetitionCreated.next.length - 1];
+                            if (previousNext == undefined) {
+                                previousNext = 0;
+                            }
+                            if (last > previousNext) {
+                                API_MyPetitionCreated.previous.push(previousNext);
+                                API_MyPetitionCreated.next.push(last);
+                            }
+                            if (last <= previousNext && API_MyPetitionCreated.previous.length > 2) {
+                                API_MyPetitionCreated.previous.pop();
+                                API_MyPetitionCreated.next.pop();
+                            }
+                        }
+                    })
+            }
+        }
+        var API_MyPetitionSigned = {
+            list: [],
+            previous: ["0"],
+            next: ["0"],
+            loadList: function (idItem) {
+
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/petition/signed/:userID/:last",
+                    params: { userID: connectedUser.id, last: idItem }
+                })
+                    .then(function (result) {
+
+                        API_MyPetitionSigned.list = result.items;
+                        goTop();
+                        if (result.items.length == 0) {
+                            startNotification("Aucune pétition signé pour le moment");
+                        } else {
+                            var last = result.items[result.items.length - 1].key.name;
+                            var previousNext = API_MyPetitionSigned.next[API_MyPetitionSigned.next.length - 1];
+                            if (previousNext == undefined) {
+                                previousNext = 0;
+                            }
+                            if (last > previousNext) {
+                                API_MyPetitionSigned.previous.push(previousNext);
+                                API_MyPetitionSigned.next.push(last);
+                            }
+                            if (last <= previousNext && API_MyPetitionSigned.previous.length > 2) {
+                                API_MyPetitionSigned.previous.pop();
+                                API_MyPetitionSigned.next.pop();
+                            }
+                        }
+                    }).catch(function (e) {
+                        startNotification("Aucune pétition signé pour le moment");
+                    })
+            }
+        }
+        var API_SearchPetition = {
+            list: [],
+            previous: ["0"],
+            next: ["0"],
+            type: "titre",
+            key_search: "",
+            changeType: function (type) {
+                API_SearchPetition.list = [];
+                API_SearchPetition.previous = ["0"];
+                API_SearchPetition.next = ["0"];
+                API_SearchPetition.type = type;
+            },
+            loadList: function (idItem) {
+
+                return m.request({
+                            method: "GET",
+                            url: hostApi + "/search/titre/:titre/:last",
+                            params: { titre: API_SearchPetition.key_search, last: idItem }
+                        })
+                    .then(function (result) {
+
+                        API_SearchPetition.list = result.items;
+                        goTop();
+                        if (result.items.length == 0) {
+                            startNotification("Aucun resultat trouvé");
+                        } else {
+                            var last = result.items[result.items.length - 1].key.name;
+                            var previousNext = API_SearchPetition.next[API_SearchPetition.next.length - 1];
+                            if (previousNext == undefined) {
+                                previousNext = 0;
+                            }
+                            if (last > previousNext) {
+                                API_SearchPetition.previous.push(previousNext);
+                                API_SearchPetition.next.push(last);
+                            }
+                            if (last <= previousNext && API_SearchPetition.previous.length > 2) {
+                                API_SearchPetition.previous.pop();
+                                API_SearchPetition.next.pop();
+                            }
+                        }
+
+
+                    })
+            }
+        }
+        var Api_CrudPetition = {
+            item: getPetitionObject(),
+            index: null,
+            previous: ["0"],
+            next: ["0"],
+            loadList: function (idItem) {
+
+            },
+            createPetition: function () {
+                return m.request({
+                    method: "POST",
+                    url: hostApi + "/petition/add",
+                    body: Api_CrudPetition.item,
+                })
+                    .then(function (result) {
+                        startNotification("Petition crée avec succès !");
+                        if (currentURL != "/MyPetitionCreated") {
+                            m.route.set("/MyPetitionCreated");
+                        } else {
+                            API_MyPetitionCreated.loadList(indexMyPetitionCreatedView);
+                        }
+
+                    })
+            },
+            updatePetition: function () {
+                return m.request({
+                    method: "POST",
+                    url: hostApi + "/petition/update",
+                    body: Api_CrudPetition.item,
+                })
+                    .then(function (result) {
+                        Api_CrudPetition.item = result.properties;
+                        Api_CrudPetition.item.ID = result.key.name;
+                        majCardView(Api_CrudPetition.index);
+                        startNotification("Petition modifié avec succès !");
+                    })
+            },
+            deletePetition: function (petitionID) {
+                return m.request({
+                    method: "GET",
+                    url: hostApi + "/petition/delete/:ID",
+                    params: { ID: petitionID }
+                })
+                    .then(function (result) {
+                        startNotification("Suppression reussie !");
+                    })
+            }
+
+        }
+
+//Routes et pages
+        var Home = {
+            view: function () {
+                return [m(navbar),              
+                m("br"),    
+                m("br"),    
+                m('div',[
+                    m(Top10NewPetitionsView)
+                ])]
+            }
+        }
+        var Top100Signed = {
+            view: function () {
+                return [m(navbar),                
+                m("br"),    
+                m("br"),                                                          
+                m('div',[
+                    m(Top10SignedPetitionsView)
+                ])]
+            }
+        }
+        var MyPetitionCreated = {
+            view: function () {
+                return [m(navbar), m(TabMyPetitionCreated),
+                m('div',[
+                    m(MyPetitionCreatedView)
+                ])]
+            }
+        }
+        var MyPetitionSigned = {
+            view: function () {
+                return [m(navbar), m(TabMyPetitionSigned),
+                m('div',[
+                    m(MyPetitionSignedView)
+                ])]
+            }
+        }
+        var SearchPetition = {
+            view: function () {
+                return [m(navbar), m(TabSearchPetition),
+                m('div',[
+                    m(SearchPetitionView)
+                ])]
+            }
+        }
+        var infoPetition = {
+            view: function () {
+                return [m(navbar), m(TabDetailPetition),
+                m('div',[
+                    m(infoPetitionView)
+                ])
+                ]
+            }
+        }
+        m.route(document.body, "/", {
+            "/": Home,
+            "/top100Signed": Top100Signed,
+            "/MyPetitionCreated": MyPetitionCreated,
+            "/MyPetitionSigned": MyPetitionSigned,
+            "/SearchPetition": SearchPetition,
+        })
+    </script>
+</body>
+
+</html>

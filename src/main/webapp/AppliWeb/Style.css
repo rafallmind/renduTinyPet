@@ -1,0 +1,147 @@
+.truncate
+{
+	width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.fw-500
+{
+	font-weight: 500px;
+}
+
+.p-22
+{
+	padding: 22px;
+}
+
+.pagination
+{
+	justify-content: center;
+}
+
+.tabs span
+{
+	align-items: center;
+	color: #4a4a4a;
+	display: flex;
+	justify-content: center;
+	margin-bottom: -1px;
+	margin: .5em ;
+	vertical-align: top;
+}
+
+.w-500
+{
+	font-weight: 500;
+}
+
+.img40
+{
+	width: 40%;
+	border-bottom-left-radius: 20px;
+	border-top-left-radius: 20px;
+}
+
+.tile
+{
+	padding: 0 24px;
+}
+
+.pb-0
+{
+padding-bottom: 0px}
+
+.mb-10
+{
+margin-bottom:10px
+}
+
+.w80
+{
+	width:80%;
+margin:auto}
+
+.tile.box
+{
+	padding: 24px;
+}
+
+form
+{
+	border-radius: 8px;
+}
+
+form header
+{
+	position: fixed!important;
+	z-index: 30;
+	width: 640px;
+	background-color: #8b00d1!important;
+	border-color: transparent;
+text-align:center!important}
+
+form header p
+{
+	color: #fff!important;
+}
+
+form section
+{
+padding-top: 73px!important}
+
+form footer .save
+{
+	margin-left:auto;
+}
+
+form footer .save
+{
+	margin-left:auto;
+}
+
+form footer .cancel
+{
+	margin-right:auto;
+}
+
+.modal.full .modal-card
+{
+	width: 100vw;
+}
+
+.modal.full .modal-card,.modal.full .form ,.modal.full section
+{
+	background: transparent;
+}
+
+.modal.full header
+{
+	width: calc(100vw - 7.4vw);
+	margin: 0 3.3vw;
+}
+
+.modal.full section
+{
+	padding-top: 0!important;
+}
+
+#notificationDetailPetition
+{
+	position: fixed;
+	bottom: 0;
+	right: 4px;
+	width: calc(33.33% - 46px);
+}
+
+.w-60
+{
+width:60%}
+
+.div_adapt
+{
+	width: 80px;
+	overflow: hidden;
+	word-wrap:break-word;
+}
